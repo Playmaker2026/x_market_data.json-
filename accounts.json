@@ -1,0 +1,11 @@
+[
+  {
+    "handle":          "RebellioMarket",
+    "label":           "Market Rebellion - IBD 50",
+    "keywords":        ["IBD 50", "IBD50"],
+    "max_tweets":      10,
+    "extract_tickers": true,
+    "frequency":       "weekly",
+    "notes":           "Weekly IBD 50 watchlist, posted Sundays"
+  }
+]
