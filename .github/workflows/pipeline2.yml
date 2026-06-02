@@ -1,34 +1,37 @@
 name: X Pipeline V2
-
+ 
 on:
   workflow_dispatch:
   push:
     branches: [main]
-
+  schedule:
+    - cron: '0 * * * *'
+ 
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout latest
         uses: actions/checkout@v4
-
+ 
       - name: Verify which code is running
         run: |
           echo "=== COMMIT ==="
           git log -1 --format=%H
-          echo "=== x_pipeline.py line count ==="
-          wc -l x_pipeline.py
           echo "=== get_full_tweet present? ==="
           grep -c "get_full_tweet" x_pipeline.py || echo "NOT FOUND"
-
+ 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Install requests
-        run: pip install requests
-
+ 
+      - name: Install Tesseract OCR
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+ 
+      - name: Install Python packages
+        run: pip install requests pytesseract pillow
+ 
       - name: Run pipeline
         env:
           XQUIK_API_KEY: ${{ secrets.XQUIK_API_KEY }}
