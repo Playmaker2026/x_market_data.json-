@@ -1,4 +1,5 @@
 name: X Market Data Pipeline
+# v3
 
 on:
   schedule:
@@ -13,6 +14,15 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Verify file
+        run: |
+          echo "Commit: $(git log -1 --format=%H)"
+          echo "x_pipeline.py size: $(wc -l < x_pipeline.py) lines"
+          grep -c "get_full_tweet" x_pipeline.py && echo "get_full_tweet: FOUND" || echo "get_full_tweet: MISSING"
 
       - name: Set up Python
         uses: actions/setup-python@v5
