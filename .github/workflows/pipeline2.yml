@@ -1,0 +1,30 @@
+name: X Pipeline V2
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 * * * *'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python packages
+        run: pip install requests
+
+      - name: Run pipeline
+        env:
+          XQUIK_API_KEY: ${{ secrets.XQUIK_API_KEY }}
+          GITHUB_TOKEN:  ${{ secrets.GIST_TOKEN }}
+          GIST_ID:       ${{ secrets.GIST_ID }}
+        run: python x_pipeline.py
