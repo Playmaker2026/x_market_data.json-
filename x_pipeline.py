@@ -1,3 +1,4 @@
+Y
 """
 X Market Data Pipeline — GitHub Actions version
 ================================================
@@ -5,11 +6,11 @@ Runs hourly in the cloud (no VPN, no local machine needed).
 Reads accounts from accounts.json.
 Calls Xquik API for each account.
 Pushes results to GitHub Gist for the dashboard to read.
-
+ 
 To add/remove accounts: edit accounts.json and commit.
 All secrets come from GitHub Actions environment variables.
 """
-
+ 
 import json
 import os
 import re
@@ -17,7 +18,7 @@ import sys
 import logging
 import requests
 from datetime import datetime, timezone
-
+ 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -26,14 +27,14 @@ logging.basicConfig(
               logging.FileHandler('x_pipeline.log', encoding='utf-8')]
 )
 log = logging.getLogger(__name__)
-
+ 
 # ── Config from environment (GitHub Actions secrets) ─────────────────────────
 XQUIK_KEY  = os.environ.get('XQUIK_API_KEY', '')
 GH_TOKEN   = os.environ.get('GITHUB_TOKEN', '')
 GIST_ID    = os.environ.get('GIST_ID', '')
 GIST_FILE  = 'x_market_data.json'
 XQUIK_BASE = 'https://xquik.com/api/v1'
-
+ 
 # ── Ticker extraction ─────────────────────────────────────────────────────────
 TICKER_RE = re.compile(r'\$([A-Z]{1,5})(?:[^A-Z]|$)')
 IGNORE = {
@@ -46,7 +47,7 @@ IGNORE = {
     'HOLD','HIGH','LAST','OPEN','STAY','TOOK','PLAY','PLAN','LOOK','LIKE',
     'JUST','BEEN','WILL','SOME','ONLY','THAN','THEN','THEM','THEY','ALSO',
 }
-
+ 
 def extract_tickers(text):
     if not text:
         return []
@@ -58,15 +59,15 @@ def extract_tickers(text):
             unique.append(t)
             seen.add(t)
     return unique
-
-
+ 
+ 
 # ── Xquik API ─────────────────────────────────────────────────────────────────
 def xquik_session():
     s = requests.Session()
     s.headers.update({'x-api-key': XQUIK_KEY, 'Content-Type': 'application/json'})
     return s
-
-
+ 
+ 
 def get_full_tweet(session, tweet_id):
     """Fetch full untruncated tweet text by ID."""
     try:
@@ -85,14 +86,14 @@ def get_full_tweet(session, tweet_id):
     except Exception as e:
         log.warning(f'  Could not fetch full tweet: {e}')
     return None
-
-
+ 
+ 
 def search_tweets(session, handle, keywords, max_tweets=10):
     """Search for tweets from @handle containing any keyword."""
     kw_part = ' OR '.join(f'"{kw}"' for kw in keywords)
     query   = f'from:{handle} ({kw_part})'
     log.info(f'  Query: {query}')
-
+ 
     url = f'{XQUIK_BASE}/x/tweets/search'
     try:
         r = session.get(url, params={'q': query, 'limit': max_tweets}, timeout=30)
@@ -118,8 +119,8 @@ def search_tweets(session, handle, keywords, max_tweets=10):
     except Exception as e:
         log.error(f'  Xquik error: {e}')
         return []
-
-
+ 
+ 
 def normalize_tweet(raw, handle):
     """Normalize raw Xquik tweet into consistent shape."""
     text     = raw.get('text') or raw.get('fullText') or raw.get('content') or ''
@@ -145,8 +146,8 @@ def normalize_tweet(raw, handle):
         'views':      metrics.get('viewCount')    or raw.get('viewCount')    or 0,
         'media_urls': media,
     }
-
-
+ 
+ 
 # ── GitHub Gist ───────────────────────────────────────────────────────────────
 def get_gist():
     """Fetch existing Gist content to preserve history."""
@@ -164,8 +165,8 @@ def get_gist():
     except Exception as e:
         log.warning(f'Could not fetch existing Gist: {e}')
     return {}
-
-
+ 
+ 
 def update_gist(content_str):
     """Push updated JSON to GitHub Gist."""
     try:
@@ -182,15 +183,15 @@ def update_gist(content_str):
     except Exception as e:
         log.error(f'Gist update failed: {e}')
         return False
-
-
+ 
+ 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def run():
     log.info('=' * 60)
     log.info('X Market Data Pipeline — GitHub Actions')
     log.info(f'Time: {datetime.now(timezone.utc).isoformat()}')
     log.info('=' * 60)
-
+ 
     # Validate secrets
     errors = []
     if not XQUIK_KEY:  errors.append('XQUIK_API_KEY secret not set')
@@ -200,7 +201,7 @@ def run():
         for e in errors:
             log.error(f'Config error: {e}')
         sys.exit(1)
-
+ 
     # Load accounts
     accounts_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'accounts.json')
     try:
@@ -210,10 +211,10 @@ def run():
     except Exception as e:
         log.error(f'Could not load accounts.json: {e}')
         sys.exit(1)
-
+ 
     # Load existing data to preserve history
     existing = get_gist()
-
+ 
     output = {
         '_meta': {
             'updated_at':         datetime.now(timezone.utc).isoformat(),
@@ -223,50 +224,50 @@ def run():
         },
         'accounts': existing.get('accounts', {})
     }
-
+ 
     session = xquik_session()
-
+ 
     for acct in accounts:
         handle   = acct.get('handle', '').strip()
         label    = acct.get('label', handle)
         keywords = acct.get('keywords', [])
         max_tw   = acct.get('max_tweets', 10)
         do_ticks = acct.get('extract_tickers', True)
-
+ 
         if not handle:
             continue
-
+ 
         log.info(f'\nProcessing @{handle} ({label})')
         log.info(f'  Keywords: {keywords}')
-
+ 
         tweets_raw = search_tweets(session, handle, keywords, max_tw)
-
+ 
         if not tweets_raw:
             log.warning(f'  No tweets found — keeping previous data')
             continue
-
+ 
         latest    = normalize_tweet(tweets_raw[0], handle)
-
+ 
         # Try to get full untruncated text (IBD 50 lists are long)
         tweet_id = latest.get('id') or tweets_raw[0].get('id') or tweets_raw[0].get('tweetId') or ''
         if tweet_id:
             full_text = get_full_tweet(session, tweet_id)
             if full_text:
                 latest['text'] = full_text
-
+ 
         tickers   = extract_tickers(latest['text']) if do_ticks else []
-
+ 
         log.info(f'  Latest date: {latest["date"]}')
         log.info(f'  Tickers extracted: {tickers}')
         log.info(f'  Media URLs: {len(latest["media_urls"])}')
-
+ 
         # Keep up to 8 recent posts for history
         prev = output['accounts'].get(handle, {}).get('recent_posts', [])
         seen_ids = {p.get('id') for p in prev}
         if latest['id'] and latest['id'] not in seen_ids:
             prev.insert(0, {**latest, 'tickers': tickers})
         prev = prev[:8]
-
+ 
         output['accounts'][handle] = {
             'handle':       handle,
             'label':        label,
@@ -276,16 +277,16 @@ def run():
             'latest':       {**latest, 'tickers': tickers},
             'recent_posts': prev,
         }
-
+ 
     # Push to Gist
     content_str = json.dumps(output, indent=2, ensure_ascii=False)
     log.info('\nPushing to GitHub Gist...')
     update_gist(content_str)
-
+ 
     log.info('\n' + '=' * 60)
     log.info('Pipeline completed successfully')
     log.info('=' * 60)
-
-
+ 
+ 
 if __name__ == '__main__':
     run()
