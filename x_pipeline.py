@@ -67,9 +67,28 @@ def xquik_session():
     return s
 
 
+def get_full_tweet(session, tweet_id):
+    """Fetch full untruncated tweet text by ID."""
+    try:
+        url = f'{XQUIK_BASE}/x/tweets/{tweet_id}'
+        r = session.get(url, timeout=15)
+        if r.status_code == 200:
+            data = r.json()
+            # Try all possible full text fields
+            full_text = (data.get('fullText')
+                      or data.get('full_text')
+                      or data.get('text')
+                      or '')
+            if full_text and len(full_text) > 200:
+                log.info(f'  Full tweet fetched: {len(full_text)} chars')
+                return full_text
+    except Exception as e:
+        log.warning(f'  Could not fetch full tweet: {e}')
+    return None
+
+
 def search_tweets(session, handle, keywords, max_tweets=10):
     """Search for tweets from @handle containing any keyword."""
-    # Build X search query
     kw_part = ' OR '.join(f'"{kw}"' for kw in keywords)
     query   = f'from:{handle} ({kw_part})'
     log.info(f'  Query: {query}')
@@ -80,17 +99,14 @@ def search_tweets(session, handle, keywords, max_tweets=10):
         log.info(f'  Status: {r.status_code}')
         if r.status_code == 400:
             log.warning(f'  400 error: {r.text}')
-            # Try simpler query without keyword filter
             r = session.get(url, params={'q': f'from:{handle}', 'limit': max_tweets}, timeout=30)
             log.info(f'  Retry status: {r.status_code}')
         r.raise_for_status()
         data   = r.json()
-        # Xquik may return tweets under different keys
         tweets = (data.get('tweets')
                or data.get('results')
                or data.get('data')
                or [])
-        # Filter by keyword if we got results from the broader query
         if keywords:
             kw_lower = [k.lower() for k in keywords]
             filtered = [t for t in tweets
@@ -230,6 +246,14 @@ def run():
             continue
 
         latest    = normalize_tweet(tweets_raw[0], handle)
+
+        # Try to get full untruncated text (IBD 50 lists are long)
+        tweet_id = latest.get('id') or tweets_raw[0].get('id') or tweets_raw[0].get('tweetId') or ''
+        if tweet_id:
+            full_text = get_full_tweet(session, tweet_id)
+            if full_text:
+                latest['text'] = full_text
+
         tickers   = extract_tickers(latest['text']) if do_ticks else []
 
         log.info(f'  Latest date: {latest["date"]}')
