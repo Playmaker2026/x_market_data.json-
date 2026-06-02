@@ -1,4 +1,6 @@
 """
+name: X Market Data Pipeline
+# v2
 X Market Data Pipeline — GitHub Actions version
 ================================================
 Runs hourly in the cloud (no VPN, no local machine needed).
