@@ -1,6 +1,4 @@
 """
-name: X Market Data Pipeline
-# v2
 X Market Data Pipeline — GitHub Actions version
 ================================================
 Runs hourly in the cloud (no VPN, no local machine needed).
@@ -70,19 +68,31 @@ def xquik_session():
  
  
 def get_full_tweet(session, tweet_id):
-    """Fetch full untruncated tweet text by ID."""
+    """Fetch full untruncated tweet text by ID. Checks note_tweet for long-form."""
     try:
         url = f'{XQUIK_BASE}/x/tweets/{tweet_id}'
         r = session.get(url, timeout=15)
+        log.info(f'  Full-tweet endpoint status: {r.status_code}')
         if r.status_code == 200:
             data = r.json()
-            # Try all possible full text fields
-            full_text = (data.get('fullText')
+            # Log all top-level keys so we can see what's available
+            log.info(f'  Tweet fields available: {list(data.keys())}')
+            # Long-form tweets store full text in note_tweet / noteTweet
+            note = (data.get('noteTweet') or data.get('note_tweet') or {})
+            note_text = ''
+            if isinstance(note, dict):
+                note_text = note.get('text') or note.get('fullText') or ''
+            elif isinstance(note, str):
+                note_text = note
+            # Standard text fields
+            full_text = (note_text
+                      or data.get('fullText')
                       or data.get('full_text')
                       or data.get('text')
                       or '')
-            if full_text and len(full_text) > 200:
-                log.info(f'  Full tweet fetched: {len(full_text)} chars')
+            log.info(f'  Full text length: {len(full_text)} chars')
+            log.info(f'  Full text preview: {full_text[:300]}')
+            if full_text:
                 return full_text
     except Exception as e:
         log.warning(f'  Could not fetch full tweet: {e}')
