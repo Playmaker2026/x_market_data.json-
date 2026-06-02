@@ -1,0 +1,34 @@
+name: X Market Data Pipeline
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Every hour, 24/7
+  workflow_dispatch:       # Manual trigger from GitHub UI anytime
+
+jobs:
+  fetch-x-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run X pipeline
+        env:
+          XQUIK_API_KEY: ${{ secrets.XQUIK_API_KEY }}
+          GITHUB_TOKEN:  ${{ secrets.GIST_TOKEN }}
+          GIST_ID:       ${{ secrets.GIST_ID }}
+        run: python x_pipeline.py
+
+      - name: Show log
+        if: always()
+        run: cat x_pipeline.log || echo "No log file"
