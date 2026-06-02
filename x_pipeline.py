@@ -68,30 +68,29 @@ def xquik_session():
  
  
 def get_full_tweet(session, tweet_id):
-    """Fetch full untruncated tweet text by ID. Checks note_tweet for long-form."""
+    """Fetch full untruncated tweet text by ID. Data is nested under 'tweet' key."""
     try:
         url = f'{XQUIK_BASE}/x/tweets/{tweet_id}'
         r = session.get(url, timeout=15)
         log.info(f'  Full-tweet endpoint status: {r.status_code}')
         if r.status_code == 200:
             data = r.json()
-            # Log all top-level keys so we can see what's available
-            log.info(f'  Tweet fields available: {list(data.keys())}')
-            # Long-form tweets store full text in note_tweet / noteTweet
-            note = (data.get('noteTweet') or data.get('note_tweet') or {})
+            # Xquik nests the tweet object under 'tweet'
+            tweet = data.get('tweet') or data
+            # Long-form note tweet (over 280 chars) lives in noteTweet
+            note = (tweet.get('noteTweet') or tweet.get('note_tweet') or {})
             note_text = ''
             if isinstance(note, dict):
                 note_text = note.get('text') or note.get('fullText') or ''
             elif isinstance(note, str):
                 note_text = note
-            # Standard text fields
             full_text = (note_text
-                      or data.get('fullText')
-                      or data.get('full_text')
-                      or data.get('text')
+                      or tweet.get('fullText')
+                      or tweet.get('full_text')
+                      or tweet.get('text')
                       or '')
+            log.info(f'  Tweet object keys: {list(tweet.keys())}')
             log.info(f'  Full text length: {len(full_text)} chars')
-            log.info(f'  Full text preview: {full_text[:300]}')
             if full_text:
                 return full_text
     except Exception as e:
